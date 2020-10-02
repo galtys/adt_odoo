@@ -5,6 +5,7 @@ import varint
 GALTYS_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS,'galtys.com')
 UUID_SIZE = 16
 SHA256_SIZE = 32
+
 class Blob(object):
 
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Blob')
@@ -16,11 +17,16 @@ class Blob(object):
     
     def _get_message(self):
         return self._uuid.bytes + varint.encode( len(self._data) ) + self._data
-
-    def encode(self):
+    
+    def hash(self):
         msg = self._get_message()
         h = hashlib.sha256(msg)
-        return msg+h.digest()
+        return h.digest()
+    
+    def encode(self):
+        msg = self._get_message()
+        h = self.hash()
+        return msg+h
 
     def decode(self, msg):
 
@@ -46,8 +52,8 @@ class TypeVariable(Blob):
             self.var = var   #str
             self._var = bytes(var, 'utf-8') #bytes
             size_var = varint.encode( len(self._var) )
-            self.var_uuid = uuid.uuid5(self._uuid, self.var) #uuid obj
-            self._data = size_var + self._var + self.var_uuid.bytes
+            #self.var_uuid = uuid.uuid5(self._uuid, self.var) #uuid obj
+            self._data = size_var + self._var # + self.var_uuid.bytes
 
     def decode(self, msg):
         #print (44*'_')
@@ -55,13 +61,18 @@ class TypeVariable(Blob):
         size = varint.decode_bytes( data )
         size_bytes_len = len(varint.encode( size ))
         self._var = data[size_bytes_len:size_bytes_len+size]
-        self._var_uuid = data[size_bytes_len+size : size_bytes_len+size+UUID_SIZE]
+        #self._var_uuid = data[size_bytes_len+size : size_bytes_len+size+UUID_SIZE]
         self.var = self._var.decode("utf-8")
         
-        assert uuid.uuid5(self._uuid,str(self.var)).bytes == self._var_uuid
-        print ([size, self.var])
-
+        #assert uuid.uuid5(self._uuid,str(self.var)).bytes == self._var_uuid
+        #print ([size, self.var])
         
+class DataConstructor(Blob):
+    _uuid = uuid.uuid5(GALTYS_NAMESPACE,'DataConstructor')
+    def __init__(self, name=None, parameters=None):
+        pass
+
+    
 TEST_BLOB = b'4kdsfja;slkfdj'
 x=Blob( TEST_BLOB )
 
@@ -73,6 +84,9 @@ msg =  x.encode()
 Blob().decode( msg )
 
 a=TypeVariable('a')
+print (a.hash() )
 msg = a.encode()
 
-TypeVariable().decode( msg )
+aa = TypeVariable()
+aa.decode( msg )
+print( aa.hash() )

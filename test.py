@@ -7,7 +7,6 @@ UUID_SIZE = 16
 SHA256_SIZE = 32
 
 class Blob(object):
-
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Blob')
 
     def __init__(self, data=None):
@@ -29,7 +28,6 @@ class Blob(object):
         return msg+h
 
     def decode(self, msg):
-
         uuid=msg[0:UUID_SIZE]
         assert self._uuid.bytes == uuid
         size = varint.decode_bytes( msg[UUID_SIZE:] )
@@ -56,7 +54,7 @@ class TypeVariable(Blob):
             self._data = size_var + self._var # + self.var_uuid.bytes
 
     def decode(self, msg):
-        #print (44*'_')
+
         data = super(TypeVariable, self).decode(msg)
         size = varint.decode_bytes( data )
         size_bytes_len = len(varint.encode( size ))
@@ -66,11 +64,44 @@ class TypeVariable(Blob):
         
         #assert uuid.uuid5(self._uuid,str(self.var)).bytes == self._var_uuid
         #print ([size, self.var])
-        
+
 class DataConstructor(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'DataConstructor')
     def __init__(self, name=None, parameters=None):
-        pass
+        if parameters is None:
+            parameters = []
+            self.parameters = parameters
+        if name is not None:
+            self.name = name   #str
+            self._name = bytes(self.name, 'utf-8') #bytes
+            size_name = varint.encode( len(self._name) )
+            #self.var_uuid = uuid.uuid5(self._uuid, self.var) #uuid obj
+
+            count_params = varint.encode( len(parameters) )
+            params = b''
+            for p in parameters:
+                params += p
+            self._data = size_name + self._name + count_params + params
+            
+    def decode(self, msg):
+
+        data = super(TypeVariable, self).decode(msg)
+        size = varint.decode_bytes( data )
+        size_bytes_len = len(varint.encode( size ))
+        pos = size_bytes_len+size
+        self._name = data[size_bytes_len:pos]
+        self.name = self._name.decode("utf-8")
+        count_params = varint.decode_bytes( data[pos:] )
+                       
+        count_params_size = len( varint.encode( count_params ) )
+        pos = pos+=count_params_size
+        parameters = []
+        for i in range(count_params):
+            p = data[ i*SHA256_SIZE: (i+1)+SHA256_SIZE ]
+            parameters.append(p)
+        self.parameters = parameters
+        #assert uuid.uuid5(self._uuid,str(self.var)).bytes == self._var_uuid
+        #print ([size, self.var])
 
     
 TEST_BLOB = b'4kdsfja;slkfdj'

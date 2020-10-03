@@ -5,6 +5,18 @@ import varint
 GALTYS_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS,'galtys.com')
 UUID_SIZE = 16
 SHA256_SIZE = 32
+
+def hash(a):
+    return hashlib.sha256(a).digest()
+
+def concat(a):
+    ret=b''
+    for x in a:
+        ret += x
+    return ret
+#to convert raw to and from hex, use    b'\xbe\xef'.hex() and bytes.fromhex('beef')
+
+
 class Blob(object):
 
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Blob')

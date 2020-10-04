@@ -171,13 +171,16 @@ class DataType(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
     
     def __init__(self, type_name=None, type_vars=None, constructors = None, cons_name = None):
-        if type_name and type_vars:
+        if type_vars is None:
+            type_vars = []
+        self.type_vars = type_vars
+        if constructors is None:
+            constructors = []
+        self.constructors = constructors
+        if type_name:
             self.type_name = type_name
             #self.cons_name = cons_name
             self._type_name = bytes(self.type_name, 'utf-8')
-            if type_vars is None:
-                type_vars = []
-            self.type_vars = type_vars
             self.init()
             
     def init(self):            
@@ -188,6 +191,12 @@ class DataType(Blob):
             for type_v in self.type_vars:
                 #self._data += type_v.refhash()
                 self._data += type_v.encode()
+                
+            self._data += encode_number( len(self.constructors) )
+            
+            for cons in self.constructors:
+                #self._data += type_v.refhash()
+                self._data += cons.encode()
             
     def refhash(self): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
         h = hashlib.sha256(self._uuid.bytes + self._type_name)
@@ -200,26 +209,24 @@ class DataType(Blob):
         pos, self._type_name = parse_data_var(pos, data)
         #print (pos, data)
         self.type_name = self._type_name.decode("utf-8")
-                                         
+
         pos, self.no_type_vars = parse_number(pos, data)
-        type_vars = []
-        #print ('number of type vars: ', self.no_type_vars)
+        type_vars = []        
         for i in range(self.no_type_vars):
             t_v = TypeVariable()
-            #print ('\n')
-            #print ('decoding type var inside of datatype')
-            #print ('decode t_v, pos', pos)
-            
             tv_size = t_v.decode(data, pos=pos)
-            #print ('data: ', data[pos:], 'tv_size', tv_size )            
             pos += tv_size
-            #print ('decode t_v after, pos', pos)
-            #print (t_v)
-            type_vars.append( t_v)
-            
+            type_vars.append( t_v)            
         self.type_vars = type_vars
-            #pos, tv_data =
-            #pos, ref_hash = parse_data_var(pos, data)
+
+        pos, self.no_cons = parse_number(pos, data)
+        constructors = []        
+        for i in range(self.no_cons):
+            cons = DataConstructor()
+            cons_size = cons.decode(data, pos=pos)
+            pos += cons_size
+            constructors.append( cons )            
+        self.constructors = constructors
             
         self.init()
         return _pos
@@ -229,7 +236,7 @@ class DataType(Blob):
 
 a=TypeVariable(type_name='List', var='VARa')
 
-b=TypeVariable(type_name='List', var='VARb')
+
 msg = a.encode()
 #print ('X', a, len(msg) )
 
@@ -256,11 +263,18 @@ if 1:
                                  cons_name='ListCons',
                                  args = [a])
 
-    st = DataType( type_name = 'List', type_vars=[a,b] )
-    msg = st.encode()
-    st2 = DataType()
-    st2.decode(msg)
 
-    assert st.hash() == st2.hash()
+    list_nil = DataConstructor( type_name = 'List',
+                                 cons_name='Nil')
+    
 
+    _List = DataType( type_name = 'List', type_vars=[a], constructors=[list_cons,list_nil]  )
+    msg = _List.encode()
+    
+    List = DataType()
+    List.decode(msg)
+
+    assert _List.hash() == List.hash()
+
+    print (List.type_vars, List.constructors)
 

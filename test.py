@@ -54,6 +54,8 @@ class Blob(object):
         msg = self._get_message()
         h = hashlib.sha256(msg)
         return h.digest()
+    def refhash(self):
+        return self.hash()    
     def encode(self):
         msg = self._get_message()
         h = self.hash()
@@ -74,6 +76,7 @@ class Blob(object):
     def get(self):
         return self._data
     
+    
 class TypeVariable(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'TypeVariable')
 
@@ -82,7 +85,10 @@ class TypeVariable(Blob):
             self.var = var   #str
             self._var = bytes(var, 'utf-8') #bytes
             self._data = encode_data_var(self._var)
-
+    def refhash(self):
+        h = hashlib.sha256(self._uuid + self._var)
+        return h.digest()
+            
     def decode(self, msg, pos=0):
 
         _pos, data = super(TypeVariable, self).decode(msg)
@@ -114,6 +120,10 @@ class DataConstructor(Blob):
             self._data = encode_data_var(self._type_name)+ \
                          encode_data_var(self._cons_name)+ \
                          encode_number( len(self.parameters) ) + params_data
+
+    def refhash(self):
+        h = hashlib.sha256(self._uuid + self._type_name + self._cons_name)
+        return h.digest()
             
     def decode(self, msg, pos=0): 
         _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
@@ -137,7 +147,7 @@ class DataConstructor(Blob):
 class TypeRef(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
     
-class SimpleType(Blob):
+class SimpleType(Blob): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
     
     def __init__(self, type_name=None, cons_name = None):
@@ -146,6 +156,9 @@ class SimpleType(Blob):
             #self.cons_name = cons_name
             self._type_name = bytes(self.type_name, 'utf-8')
             self._data = encode_data_var(self._type_name) + DataConstructor(type_name=type_name, cons_name=cons_name).encode()
+    def refhash(self):
+        h = hashlib.sha256(self._uuid + self._type_name)
+        return h.digest()
 
     def decode(self, msg, pos=0):
         _pos, data = super(SimpleType, self).decode(msg)

@@ -52,7 +52,7 @@ class Blob(object):
     def decode(self, msg, pos=0):
 
         pos, uuid = parse_data_fixed(pos, msg, UUID_SIZE)
-        
+        #print ([self._uuid.bytes, uuid])
         assert self._uuid.bytes == uuid
         
         pos, self._data = parse_data_var(pos, msg)
@@ -103,8 +103,9 @@ class DataConstructor(Blob):
             self._data = encode_data_var(self._type_name)+encode_data_var(self._cons_name) #+ count_params + params
             
     def decode(self, msg, pos=0): 
-        _pos, data = super(DataConstructor, self).decode(msg)
-
+        _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
+        #print (_pos, pos, data)
+        pos=0
         pos, self._type_name = parse_data_var(pos, data)
         self.type_name = self._type_name.decode("utf-8")
 
@@ -135,8 +136,10 @@ class SimpleType(Blob):
 
     def decode(self, msg, pos=0):
         _pos, data = super(SimpleType, self).decode(msg)
-
+        #print ([_pos,data])
+        
         pos, self._type_name = parse_data_var(pos, data)
+        #print (pos, data)
         self.type_name = self._type_name.decode("utf-8")
         
         dc = DataConstructor()
@@ -177,3 +180,5 @@ st = SimpleType( type_name = 'Boolean', cons_name='True')
 msg = st.encode()
 st2 = SimpleType()
 st2.decode(msg)
+
+assert st.hash() == st2.hash()

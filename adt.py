@@ -103,7 +103,7 @@ class TypeVariable(Blob):
     def decode(self, msg, pos=0):
 
         _pos, data = super(TypeVariable, self).decode(msg, pos=pos)
-        print ('decode type var, _pos: %s, len(msg): %s' % (_pos, len(msg)) )
+        #print ('decode type var, _pos: %s, len(msg): %s' % (_pos, len(msg)) )
         pos=0
         pos, self._type_name = parse_data_var(pos, data)        
         pos, self._var = parse_data_var(pos, data)
@@ -203,18 +203,18 @@ class DataType(Blob):
                                          
         pos, self.no_type_vars = parse_number(pos, data)
         type_vars = []
-        print ('number of type vars: ', self.no_type_vars)
+        #print ('number of type vars: ', self.no_type_vars)
         for i in range(self.no_type_vars):
             t_v = TypeVariable()
-            print ('\n')
-            print ('decoding type var inside of datatype')
+            #print ('\n')
+            #print ('decoding type var inside of datatype')
             #print ('decode t_v, pos', pos)
             
             tv_size = t_v.decode(data, pos=pos)
-            print ('data: ', data[pos:], 'tv_size', tv_size )            
+            #print ('data: ', data[pos:], 'tv_size', tv_size )            
             pos += tv_size
             #print ('decode t_v after, pos', pos)
-            print (t_v)
+            #print (t_v)
             type_vars.append( t_v)
             
         self.type_vars = type_vars
@@ -231,7 +231,7 @@ a=TypeVariable(type_name='List', var='VARa')
 
 b=TypeVariable(type_name='List', var='VARb')
 msg = a.encode()
-print ('X', a, len(msg) )
+#print ('X', a, len(msg) )
 
 aa = TypeVariable()
 sz = aa.decode( msg )

@@ -118,13 +118,16 @@ class TypeVariable(Blob):
     def __repr__(self):
         return "<%s %s %s %s>"%(self._type, self.refhash().hex(), self.type_name, self.var)
 
+
 class DataConstructor(Blob):
     _type = 'DataConstructor'
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
-    def __init__(self, type_name=None, cons_name=None, args=None):
+    def __init__(self, type_name=None, cons_name=None, args=None, to_bytes=None, from_bytes=None):
         if args is None:
             args = []
         self.args = args
+        self.to_bytes =to_bytes
+        self.from_bytes = from_bytes
         if type_name and cons_name:
             self.type_name = type_name #str
             self._type_name = bytes(self.type_name, 'utf-8') #bytes
@@ -140,11 +143,27 @@ class DataConstructor(Blob):
             self._data = encode_data_var(self._type_name)+ \
                          encode_data_var(self._cons_name)+ \
                          encode_number( len(self.args) ) + params_data
-
+            
     def refhash(self):
         h = hashlib.sha256(self._uuid.bytes + self._type_name + self._cons_name)
         return h.digest()
-            
+    #def encode(self, data_args = None):
+        #if data_args and self.to_bytes:
+        #    x=self.to_bytes(self, data_args)
+        #    print (x)
+        #    self._data += x
+        #ret = super(DataConstructor, self).encode()
+        #return ret
+    def data_encode(self, a):
+        x=self.to_bytes(self, a)
+        return x
+    def data_decode(self, data, pos=0):
+        #rh = self.refhash()
+        #assert rh == data[pos:pos+SHA256_SIZE]
+        #pos += SHA256_SIZE
+        pos, ret = self.from_bytes(self, pos, data[pos:] )
+        return ret
+    
     def decode(self, msg, pos=0): 
         _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
         #print (_pos, pos, data)
@@ -164,6 +183,7 @@ class DataConstructor(Blob):
             #p = pb.decode('utf-8')
             args.append(pb)
         self.ref_args = args
+        #pos, self.data_args = self.from_bytes(self, pos, data)
         return _pos
     
 class DataType(Blob):
@@ -185,7 +205,6 @@ class DataType(Blob):
             
     def init(self):            
             self._data = encode_data_var(self._type_name) #DataConstructor(type_name=type_name, cons_name=cons_name).encode()
-
             self._data += encode_number( len(self.type_vars) )
             
             for type_v in self.type_vars:
@@ -234,6 +253,15 @@ class DataType(Blob):
         #dc.decode(data, pos=pos)
         #self._data = encode_data_var(self._type_name) #+ dc.encode()
 
+def int64b_to_bytes(d, a):
+    ret=a.to_bytes(4, byteorder='big' )
+    return ret
+
+def int64b_from_bytes(d, pos, b):
+    ret=int.from_bytes(b[pos:], byteorder='big' )
+    pos+=4
+    return pos, ret
+
 a=TypeVariable(type_name='List', var='VARa')
 
 
@@ -246,8 +274,14 @@ sz = aa.decode( msg )
 #print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
 
 if 1:
-    type_int64 = DataConstructor( type_name = 'Int64', cons_name='Int64' )
-
+    Int64 = DataConstructor( type_name = 'Int64',
+                             cons_name='Int64',
+                             to_bytes=int64b_to_bytes,
+                             from_bytes = int64b_from_bytes)
+    
+    msg = Int64.data_encode(5411221)
+    ret = Int64.data_decode( msg )
+    print ('t64 msg', msg, ret)
 
 if 0:
     dc = DataConstructor( type_name = 'Boolean', cons_name='True')

@@ -42,7 +42,8 @@ def parse_number(pos, msg):
     return pos, n
 
 class Blob(object):
-    _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Blob')
+    _type = 'Blob'
+    _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
 
     def __init__(self, data=None):
         self._data = data
@@ -61,9 +62,11 @@ class Blob(object):
         h = self.hash()
         return msg+h
     def decode(self, msg, pos=0):
-
+        _pos_start = pos
+        
         pos, uuid = parse_data_fixed(pos, msg, UUID_SIZE)
         #print ([self._uuid.bytes, uuid])
+        
         assert self._uuid.bytes == uuid
         
         pos, self._data = parse_data_var(pos, msg)
@@ -71,44 +74,53 @@ class Blob(object):
         pos, sha256 = parse_data_fixed(pos, msg, SHA256_SIZE)
 
         assert sha256 == hashlib.sha256(self._get_message() ).digest()
-        return pos, self._data
+        return pos-_pos_start, self._data
     
     def get(self):
         return self._data
+    def __repr__(self):
+        return "<%s %s>"%(self._type, self.refhash().hex())
     
 
 class TypeVariable(Blob):
-    _uuid = uuid.uuid5(GALTYS_NAMESPACE,'TypeVariable')
+    _type = 'TypeVariable'
+    _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
 
     def __init__(self, type_name=None, var=None):
         if type_name and var:
             self.type_name = type_name
             self.var = var   #str
             self._var = bytes(var, 'utf-8') #bytes
-            self._type_name = bytes(type_name, 'utf-8')            
-            self._data = encode_data_var(self._var) + encode_data_var(self._var)
+            self._type_name = bytes(type_name, 'utf-8')
+            self.init()
+            
+    def init(self):
+            self._data = encode_data_var(self._type_name) + encode_data_var(self._var)
             
     def refhash(self):
-        h = hashlib.sha256(self._uuid + self._type_name + self._var)
+        h = hashlib.sha256(self._uuid.bytes + self._type_name + self._var)
         return h.digest()
-            
     def decode(self, msg, pos=0):
 
         _pos, data = super(TypeVariable, self).decode(msg, pos=pos)
+        print ('decode type var, _pos: %s, len(msg): %s' % (_pos, len(msg)) )
         pos=0
         pos, self._type_name = parse_data_var(pos, data)        
         pos, self._var = parse_data_var(pos, data)
         
         self.type_name = self._type_name.decode("utf-8")        
         self.var = self._var.decode("utf-8")
-
-        return pos
+        self.init()
+        return _pos
     
     def get_var(self):
         return self.var
+    def __repr__(self):
+        return "<%s %s %s %s>"%(self._type, self.refhash().hex(), self.type_name, self.var)
 
 class DataConstructor(Blob):
-    _uuid = uuid.uuid5(GALTYS_NAMESPACE,'DataConstructor')
+    _type = 'DataConstructor'
+    _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
     def __init__(self, type_name=None, cons_name=None, args=None):
         if args is None:
             args = []
@@ -121,7 +133,8 @@ class DataConstructor(Blob):
 
             params_data = b''
             for p in self.args:
-                pb = bytes(p, 'utf-8')
+                pb = p.refhash()
+                #pb = bytes(p, 'utf-8')
                 params_data += encode_data_var(pb)
             
             self._data = encode_data_var(self._type_name)+ \
@@ -129,7 +142,7 @@ class DataConstructor(Blob):
                          encode_number( len(self.args) ) + params_data
 
     def refhash(self):
-        h = hashlib.sha256(self._uuid + self._type_name + self._cons_name)
+        h = hashlib.sha256(self._uuid.bytes + self._type_name + self._cons_name)
         return h.digest()
             
     def decode(self, msg, pos=0): 
@@ -146,14 +159,16 @@ class DataConstructor(Blob):
 
         args = []
         for i in range(self.no_args):
+
             pos, pb = parse_data_var(pos, data)
-            p = pb.decode('utf-8')
-            args.append(p)
-        self.args = args
-        return pos
+            #p = pb.decode('utf-8')
+            args.append(pb)
+        self.ref_args = args
+        return _pos
     
-class DataType(Blob): 
-    _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
+class DataType(Blob):
+    _type = 'DataType'
+    _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
     
     def __init__(self, type_name=None, type_vars=None, constructors = None, cons_name = None):
         if type_name and type_vars:
@@ -175,81 +190,77 @@ class DataType(Blob):
                 self._data += type_v.encode()
             
     def refhash(self): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
-        h = hashlib.sha256(self._uuid + self._type_name)
+        h = hashlib.sha256(self._uuid.bytes + self._type_name)
         return h.digest()
 
     def decode(self, msg, pos=0):
-        _pos, data = super(DataType, self).decode(msg)
+        _pos, data = super(DataType, self).decode(msg, pos=pos)
         #print ([_pos,data])
-        
+        pos =0
         pos, self._type_name = parse_data_var(pos, data)
         #print (pos, data)
         self.type_name = self._type_name.decode("utf-8")
                                          
         pos, self.no_type_vars = parse_number(pos, data)
         type_vars = []
+        print ('number of type vars: ', self.no_type_vars)
         for i in range(self.no_type_vars):
             t_v = TypeVariable()
-            pos = t_v.decode(data, pos=pos)
+            print ('\n')
+            print ('decoding type var inside of datatype')
+            #print ('decode t_v, pos', pos)
+            
+            tv_size = t_v.decode(data, pos=pos)
+            print ('data: ', data[pos:], 'tv_size', tv_size )            
+            pos += tv_size
+            #print ('decode t_v after, pos', pos)
+            print (t_v)
             type_vars.append( t_v)
+            
         self.type_vars = type_vars
             #pos, tv_data =
             #pos, ref_hash = parse_data_var(pos, data)
             
-        self.init()                                
+        self.init()
+        return _pos
         #dc = DataConstructor()
         #dc.decode(data, pos=pos)
         #self._data = encode_data_var(self._type_name) #+ dc.encode()
 
-TEST_BLOB = b'4kdsfja;slkfdj'
-x=Blob( TEST_BLOB )
+a=TypeVariable(type_name='List', var='VARa')
 
-msg =  x.encode() 
-
-#print (msg, len(msg), len(TEST_BLOB)  )
-
-Blob().decode( msg )
-
-a=TypeVariable(type_name='List', var='a')
-#print (a.hash() )
+b=TypeVariable(type_name='List', var='VARb')
 msg = a.encode()
+print ('X', a, len(msg) )
 
 aa = TypeVariable()
-aa.decode( msg )
+sz = aa.decode( msg )
 #print( aa.hash() )
+#print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
 
 
+if 0:
+    dc = DataConstructor( type_name = 'Boolean', cons_name='True')
+    msg = dc.encode()
+    dc2 = DataConstructor()
+    dc2.decode(msg)
+    assert dc.hash()==dc2.hash()
 
-dc = DataConstructor( type_name = 'Boolean', cons_name='True')
-msg = dc.encode()
 #print (dc.hash() )
 
 
-dc2 = DataConstructor()
-dc2.decode(msg)
-assert dc.hash()==dc2.hash()
-#print (dc2.type_name, dc2.cons_name)
-#print (dc2.hash() )
+if 1:
+    #print (dc2.type_name, dc2.cons_name)
+    #print (dc2.hash() )
+    list_cons = DataConstructor( type_name = 'List',
+                                 cons_name='ListCons',
+                                 args = [a])
 
-st = DataType( type_name = 'List', type_vars=[a] )
-msg = st.encode()
-st2 = DataType()
-st2.decode(msg)
+    st = DataType( type_name = 'List', type_vars=[a,b] )
+    msg = st.encode()
+    st2 = DataType()
+    st2.decode(msg)
 
-assert st.hash() == st2.hash()
-
-
-dc = DataConstructor( type_name = 'Partner',
-                      cons_name='Partner',
-                      args = ['name','street','street2'])
-msg = dc.encode()
-print (msg)
-#print (dc.hash() )
-
-
-dc2 = DataConstructor()
-dc2.decode(msg)
-
-assert dc.hash()==dc2.hash()
+    assert st.hash() == st2.hash()
 
 

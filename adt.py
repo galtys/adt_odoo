@@ -245,6 +245,9 @@ sz = aa.decode( msg )
 #print( aa.hash() )
 #print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
 
+if 1:
+    type_int64 = DataConstructor( type_name = 'Int64', cons_name='Int64' )
+
 
 if 0:
     dc = DataConstructor( type_name = 'Boolean', cons_name='True')
@@ -259,6 +262,8 @@ if 0:
 if 1:
     #print (dc2.type_name, dc2.cons_name)
     #print (dc2.hash() )
+
+    
     list_cons = DataConstructor( type_name = 'List',
                                  cons_name='ListCons',
                                  args = [a])

@@ -102,10 +102,10 @@ class TypeVariable(Blob):
 
 class DataConstructor(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'DataConstructor')
-    def __init__(self, type_name=None, cons_name=None, parameters=None):
-        if parameters is None:
-            parameters = []
-        self.parameters = parameters
+    def __init__(self, type_name=None, cons_name=None, args=None):
+        if args is None:
+            args = []
+        self.args = args
         if type_name and cons_name:
             self.type_name = type_name #str
             self._type_name = bytes(self.type_name, 'utf-8') #bytes
@@ -113,13 +113,13 @@ class DataConstructor(Blob):
             self._cons_name = bytes(self.cons_name, 'utf-8') #bytes
 
             params_data = b''
-            for p in self.parameters:
+            for p in self.args:
                 pb = bytes(p, 'utf-8')
                 params_data += encode_data_var(pb)
             
             self._data = encode_data_var(self._type_name)+ \
                          encode_data_var(self._cons_name)+ \
-                         encode_number( len(self.parameters) ) + params_data
+                         encode_number( len(self.args) ) + params_data
 
     def refhash(self):
         h = hashlib.sha256(self._uuid + self._type_name + self._cons_name)
@@ -135,19 +135,16 @@ class DataConstructor(Blob):
         pos, self._cons_name = parse_data_var(pos, data)
         self.cons_name = self._cons_name.decode("utf-8")
 
-        pos, self.no_parameters = parse_number(pos, data)
+        pos, self.no_args = parse_number(pos, data)
 
-        parameters = []
-        for i in range(self.no_parameters):
+        args = []
+        for i in range(self.no_args):
             pos, pb = parse_data_var(pos, data)
             p = pb.decode('utf-8')
-            parameters.append(p)
-        self.parameters = parameters
+            args.append(p)
+        self.args = args
     
-class TypeRef(Blob):
-    _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
-    
-class SimpleType(Blob): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
+class SimpleType(Blob): 
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
     
     def __init__(self, type_name=None, cons_name = None):
@@ -156,7 +153,8 @@ class SimpleType(Blob): #due to the suport of recursive types, reference hash is
             #self.cons_name = cons_name
             self._type_name = bytes(self.type_name, 'utf-8')
             self._data = encode_data_var(self._type_name) + DataConstructor(type_name=type_name, cons_name=cons_name).encode()
-    def refhash(self):
+            
+    def refhash(self): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
         h = hashlib.sha256(self._uuid + self._type_name)
         return h.digest()
 
@@ -212,7 +210,7 @@ assert st.hash() == st2.hash()
 
 dc = DataConstructor( type_name = 'Partner',
                       cons_name='Partner',
-                      parameters = ['name','street','street2'])
+                      args = ['name','street','street2'])
 msg = dc.encode()
 print (msg)
 #print (dc.hash() )

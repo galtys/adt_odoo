@@ -28,9 +28,18 @@ def parse_data_fixed(pos, msg, size):
     data = msg[pos : pos + size]
     pos = pos + size
     return pos, data
+
 def encode_data_var(data):
     size = varint.encode( len(data) )
     return size+data
+def encode_number(a):
+    return varint.encode( a )
+
+def parse_number(pos, msg):
+    n = varint.decode_bytes( msg[pos:] )
+    n_len = len( varint.encode(n) )
+    pos = pos+n_len
+    return pos, n
 
 class Blob(object):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Blob')
@@ -40,7 +49,7 @@ class Blob(object):
     def get_sha256(self):
         pass    
     def _get_message(self):
-        return self._uuid.bytes + encode_data_var(self._data) #varint.encode( len(self._data) ) + self._data
+        return self._uuid.bytes + encode_data_var(self._data) 
     def hash(self):
         msg = self._get_message()
         h = hashlib.sha256(msg)
@@ -90,17 +99,21 @@ class DataConstructor(Blob):
     def __init__(self, type_name=None, cons_name=None, parameters=None):
         if parameters is None:
             parameters = []
-            self.parameters = parameters
+        self.parameters = parameters
         if type_name and cons_name:
             self.type_name = type_name #str
             self._type_name = bytes(self.type_name, 'utf-8') #bytes
             self.cons_name = cons_name
             self._cons_name = bytes(self.cons_name, 'utf-8') #bytes
-            #count_params = varint.encode( len(parameters) )
-            #params = b''
-            #for p in parameters:
-            #    params += p
-            self._data = encode_data_var(self._type_name)+encode_data_var(self._cons_name) #+ count_params + params
+
+            params_data = b''
+            for p in self.parameters:
+                pb = bytes(p, 'utf-8')
+                params_data += encode_data_var(pb)
+            
+            self._data = encode_data_var(self._type_name)+ \
+                         encode_data_var(self._cons_name)+ \
+                         encode_number( len(self.parameters) ) + params_data
             
     def decode(self, msg, pos=0): 
         _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
@@ -111,15 +124,15 @@ class DataConstructor(Blob):
 
         pos, self._cons_name = parse_data_var(pos, data)
         self.cons_name = self._cons_name.decode("utf-8")
-                
-        #count_params = varint.decode_bytes( data[pos:] )                       
-        #count_params_size = len( varint.encode( count_params ) )
-        #pos = pos+=count_params_size
-        #parameters = []
-        #for i in range(count_params):
-        #    p = data[ i*SHA256_SIZE: (i+1)+SHA256_SIZE ]
-        #    parameters.append(p)
-        #self.parameters = parameters
+
+        pos, self.no_parameters = parse_number(pos, data)
+
+        parameters = []
+        for i in range(self.no_parameters):
+            pos, pb = parse_data_var(pos, data)
+            p = pb.decode('utf-8')
+            parameters.append(p)
+        self.parameters = parameters
     
 class TypeRef(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
@@ -182,3 +195,19 @@ st2 = SimpleType()
 st2.decode(msg)
 
 assert st.hash() == st2.hash()
+
+
+dc = DataConstructor( type_name = 'Partner',
+                      cons_name='Partner',
+                      parameters = ['name','street','street2'])
+msg = dc.encode()
+print (msg)
+#print (dc.hash() )
+
+
+dc2 = DataConstructor()
+dc2.decode(msg)
+
+assert dc.hash()==dc2.hash()
+
+

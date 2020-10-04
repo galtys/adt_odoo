@@ -108,7 +108,7 @@ class TypeVariable(Blob):
         pos, self._type_name = parse_data_var(pos, data)        
         pos, self._var = parse_data_var(pos, data)
         
-        self.type_name = self._type_name.decode("utf-8")        
+        self.type_name = self._type_name.decode("utf-8")
         self.var = self._var.decode("utf-8")
         self.init()
         return _pos
@@ -162,7 +162,7 @@ class DataConstructor(Blob):
         #assert rh == data[pos:pos+SHA256_SIZE]
         #pos += SHA256_SIZE
         pos, ret = self.from_bytes(self, pos, data[pos:] )
-        return ret
+        return pos, ret
     
     def decode(self, msg, pos=0): 
         _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
@@ -254,13 +254,32 @@ class DataType(Blob):
         #self._data = encode_data_var(self._type_name) #+ dc.encode()
 
 def int64b_to_bytes(d, a):
-    ret=a.to_bytes(4, byteorder='big' )
+    ret=a.to_bytes(8, byteorder='big' )
     return ret
 
 def int64b_from_bytes(d, pos, b):
     ret=int.from_bytes(b[pos:], byteorder='big' )
+    pos+=8
+    return pos, ret
+
+def int32b_to_bytes(d, a):
+    ret=a.to_bytes(4, byteorder='big' )
+    return ret
+
+def int32b_from_bytes(d, pos, b):
+    ret=int.from_bytes(b[pos:], byteorder='big' )
     pos+=4
     return pos, ret
+
+def string_to_bytes(d, a):
+    ab = bytes(a, 'utf-8') #bytes
+    ret = encode_data_var(ab)
+    return ret
+
+def string_from_bytes(d, pos, b):
+    pos, _ret = parse_data_var(pos, b)
+    return pos, _ret.decode('utf-8')
+
 
 a=TypeVariable(type_name='List', var='VARa')
 
@@ -274,14 +293,22 @@ sz = aa.decode( msg )
 #print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
 
 if 1:
-    Int64 = DataConstructor( type_name = 'Int64',
-                             cons_name='Int64',
+    ConsInt64 = DataConstructor( type_name = 'Int64',
+                             cons_name='ConsInt64',
                              to_bytes=int64b_to_bytes,
                              from_bytes = int64b_from_bytes)
+    ConsString = DataConstructor( type_name = 'String',
+                             cons_name='ConsString',
+                             to_bytes=string_to_bytes,
+                             from_bytes = string_from_bytes)
     
-    msg = Int64.data_encode(5411221)
-    ret = Int64.data_decode( msg )
+    msg = ConsInt64.data_encode(5411221)
+    ret = ConsInt64.data_decode( msg )
     print ('t64 msg', msg, ret)
+
+    msg = ConsString.data_encode('buf baf x kuk')
+    ret = ConsString.data_decode( msg )
+    print ('str test msg', msg, ret)
 
 if 0:
     dc = DataConstructor( type_name = 'Boolean', cons_name='True')
@@ -292,6 +319,14 @@ if 0:
 
 #print (dc.hash() )
 
+def list_cons_to_bytes(d, a):
+    ab = bytes(a, 'utf-8') #bytes
+    ret = encode_data_var(ab)
+    return ret
+
+def string_from_bytes(d, pos, b):
+    pos, _ret = parse_data_var(pos, b)
+    return pos, _ret.decode('utf-8')
 
 if 1:
     #print (dc2.type_name, dc2.cons_name)

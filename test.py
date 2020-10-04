@@ -144,7 +144,7 @@ class DataConstructor(Blob):
             args.append(p)
         self.args = args
     
-class SimpleType(Blob): 
+class DataType(Blob): 
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
     
     def __init__(self, type_name=None, cons_name = None):
@@ -159,7 +159,7 @@ class SimpleType(Blob):
         return h.digest()
 
     def decode(self, msg, pos=0):
-        _pos, data = super(SimpleType, self).decode(msg)
+        _pos, data = super(DataType, self).decode(msg)
         #print ([_pos,data])
         
         pos, self._type_name = parse_data_var(pos, data)
@@ -200,9 +200,9 @@ assert dc.hash()==dc2.hash()
 #print (dc2.type_name, dc2.cons_name)
 #print (dc2.hash() )
 
-st = SimpleType( type_name = 'Boolean', cons_name='True')
+st = DataType( type_name = 'Boolean', cons_name='True')
 msg = st.encode()
-st2 = SimpleType()
+st2 = DataType()
 st2.decode(msg)
 
 assert st.hash() == st2.hash()

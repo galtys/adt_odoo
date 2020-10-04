@@ -94,7 +94,8 @@ class TypeVariable(Blob):
             
     def decode(self, msg, pos=0):
 
-        _pos, data = super(TypeVariable, self).decode(msg)
+        _pos, data = super(TypeVariable, self).decode(msg, pos=pos)
+        pos=0
         pos, self._type_name = parse_data_var(pos, data)        
         pos, self._var = parse_data_var(pos, data)
         
@@ -149,16 +150,29 @@ class DataConstructor(Blob):
             p = pb.decode('utf-8')
             args.append(p)
         self.args = args
+        return pos
     
 class DataType(Blob): 
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
     
     def __init__(self, type_name=None, type_vars=None, constructors = None, cons_name = None):
-        if type_name and cons_name:
+        if type_name and type_vars:
             self.type_name = type_name
             #self.cons_name = cons_name
             self._type_name = bytes(self.type_name, 'utf-8')
-            self._data = encode_data_var(self._type_name) + DataConstructor(type_name=type_name, cons_name=cons_name).encode()
+            if type_vars is None:
+                type_vars = []
+            self.type_vars = type_vars
+            self.init()
+            
+    def init(self):            
+            self._data = encode_data_var(self._type_name) #DataConstructor(type_name=type_name, cons_name=cons_name).encode()
+
+            self._data += encode_number( len(self.type_vars) )
+            
+            for type_v in self.type_vars:
+                #self._data += type_v.refhash()
+                self._data += type_v.encode()
             
     def refhash(self): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
         h = hashlib.sha256(self._uuid + self._type_name)
@@ -171,10 +185,21 @@ class DataType(Blob):
         pos, self._type_name = parse_data_var(pos, data)
         #print (pos, data)
         self.type_name = self._type_name.decode("utf-8")
-        
-        dc = DataConstructor()
-        dc.decode(data, pos=pos)
-        self._data = encode_data_var(self._type_name) + dc.encode()
+                                         
+        pos, self.no_type_vars = parse_number(pos, data)
+        type_vars = []
+        for i in range(self.no_type_vars):
+            t_v = TypeVariable()
+            pos = t_v.decode(data, pos=pos)
+            type_vars.append( t_v)
+        self.type_vars = type_vars
+            #pos, tv_data =
+            #pos, ref_hash = parse_data_var(pos, data)
+            
+        self.init()                                
+        #dc = DataConstructor()
+        #dc.decode(data, pos=pos)
+        #self._data = encode_data_var(self._type_name) #+ dc.encode()
 
 TEST_BLOB = b'4kdsfja;slkfdj'
 x=Blob( TEST_BLOB )
@@ -185,7 +210,7 @@ msg =  x.encode()
 
 Blob().decode( msg )
 
-a=TypeVariable(type_name='Test', var='a')
+a=TypeVariable(type_name='List', var='a')
 #print (a.hash() )
 msg = a.encode()
 
@@ -206,7 +231,7 @@ assert dc.hash()==dc2.hash()
 #print (dc2.type_name, dc2.cons_name)
 #print (dc2.hash() )
 
-st = DataType( type_name = 'Boolean', cons_name='True')
+st = DataType( type_name = 'List', type_vars=[a] )
 msg = st.encode()
 st2 = DataType()
 st2.decode(msg)

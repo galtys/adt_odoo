@@ -76,25 +76,31 @@ class Blob(object):
     def get(self):
         return self._data
     
-    
+
 class TypeVariable(Blob):
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'TypeVariable')
 
-    def __init__(self, var=None):
-        if var is not None:
+    def __init__(self, type_name=None, var=None):
+        if type_name and var:
+            self.type_name = type_name
             self.var = var   #str
             self._var = bytes(var, 'utf-8') #bytes
-            self._data = encode_data_var(self._var)
+            self._type_name = bytes(type_name, 'utf-8')            
+            self._data = encode_data_var(self._var) + encode_data_var(self._var)
+            
     def refhash(self):
-        h = hashlib.sha256(self._uuid + self._var)
+        h = hashlib.sha256(self._uuid + self._type_name + self._var)
         return h.digest()
             
     def decode(self, msg, pos=0):
 
         _pos, data = super(TypeVariable, self).decode(msg)
-
+        pos, self._type_name = parse_data_var(pos, data)        
         pos, self._var = parse_data_var(pos, data)
+        
+        self.type_name = self._type_name.decode("utf-8")        
         self.var = self._var.decode("utf-8")
+
         return pos
     
     def get_var(self):
@@ -147,7 +153,7 @@ class DataConstructor(Blob):
 class DataType(Blob): 
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,'Type')
     
-    def __init__(self, type_name=None, cons_name = None):
+    def __init__(self, type_name=None, type_vars=None, constructors = None, cons_name = None):
         if type_name and cons_name:
             self.type_name = type_name
             #self.cons_name = cons_name
@@ -179,7 +185,7 @@ msg =  x.encode()
 
 Blob().decode( msg )
 
-a=TypeVariable('a')
+a=TypeVariable(type_name='Test', var='a')
 #print (a.hash() )
 msg = a.encode()
 

@@ -129,11 +129,13 @@ class TypeVariable(Blob):
 class DataConstructor(Blob):
     _type = 'DataConstructor'
     _uuid = uuid.uuid5(GALTYS_NAMESPACE,_type)
-    def __init__(self, type_name=None, cons_name=None, args=None, to_bytes=None, from_bytes=None):
+    def __init__(self, type_name=None, cons_name=None,
+                 args=None, to_bytes=None, from_bytes=None,
+                 encode_hash=True):
         if args is None:
             args = []
         self.args = args
-        
+        self.encode_hash = encode_hash #data
         self.to_bytes =to_bytes
         self.from_bytes = from_bytes
         if type_name and cons_name:
@@ -157,15 +159,41 @@ class DataConstructor(Blob):
         return h.digest()
     def __repr__(self):
         return "<%s %s %s %s>"%(self._type, self.refhash().hex(), self.type_name, self.cons_name)
-    def data_encode(self, a):
+    def data_set(self, a):
+        self.data = a
+    def data_get(self):
+        return self.data
+    def data_encode(self):
+        a=self.data
         x=self.to_bytes(self, a)
-        return x
-    def data_decode(self, data, pos=0):
-        #rh = self.refhash()
-        #assert rh == data[pos:pos+SHA256_SIZE]
-        #pos += SHA256_SIZE
-        pos, ret = self.from_bytes(self, pos, data[pos:] )
-        return pos, ret
+        if self.encode_hash: #datacons has before, value, data hash after
+            h = self.hash()
+            _hx = h+x
+            h2 = hashlib.sha256( _hx ).digest()
+            ret = _hx + h2
+        else:
+            ret =  x
+        return ret
+    
+    def data_decode(self, msg, pos=0):
+
+        if self.encode_hash:
+            h = self.hash()
+            assert h == msg[pos:pos+SHA256_SIZE]
+            pos += SHA256_SIZE
+            
+            pos, ret = self.from_bytes(self, pos, msg )
+            h2d = msg[pos:pos+SHA256_SIZE]
+            pos += SHA256_SIZE
+        else:
+            pos, ret = self.from_bytes(self, pos, msg )
+        self.data = ret
+        if self.encode_hash:
+            x=self.to_bytes(self, self.data)
+            h = self.hash()
+            h2 = hashlib.sha256( h+x ).digest()
+            assert h2 == h2d            
+        return pos
     
     def decode(self, msg, pos=0): 
         _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
@@ -262,7 +290,7 @@ def int64b_to_bytes(d, a):
     return ret
 
 def int64b_from_bytes(d, pos, b):
-    ret=int.from_bytes(b[pos:], byteorder='big' )
+    ret=int.from_bytes(b[pos:pos+8], byteorder='big' )
     pos+=8
     return pos, ret
 
@@ -271,7 +299,7 @@ def int32b_to_bytes(d, a):
     return ret
 
 def int32b_from_bytes(d, pos, b):
-    ret=int.from_bytes(b[pos:], byteorder='big' )
+    ret=int.from_bytes(b[pos:pos+4], byteorder='big' )
     pos+=4
     return pos, ret
 
@@ -280,10 +308,9 @@ def int8b_to_bytes(d, a):
     return ret
 
 def int8b_from_bytes(d, pos, b):
-    ret=int.from_bytes(b[pos:], byteorder='big' )
+    ret=int.from_bytes(b[pos:pos+1], byteorder='big' )
     pos+=1
     return pos, ret
-
 
 def string_to_bytes(d, a):
     ab = bytes(a, 'utf-8') #bytes
@@ -301,11 +328,10 @@ if 1:
     _Int32 = DataType( type_name = 'Int32' )
     _Int8 = DataType( type_name = 'Int8' )
     _String = DataType( type_name = 'String' )
-    _Boolean = DataType( type_name = 'Boolean' )
     
     ConsInt64 = DataConstructor( type_name = 'Int64',
                              cons_name='ConsInt64',
-                             args = [_Int64],
+                             args = [_Int64], #shoud be python buildin type int .. ?
                              to_bytes=int64b_to_bytes,  
                              from_bytes = int64b_from_bytes)
     ConsInt32 = DataConstructor( type_name = 'Int32',
@@ -327,11 +353,9 @@ if 1:
     
 
     ConsBooleanTrue  =  DataConstructor( type_name = 'Boolean',
-                                         cons_name='True',
-                                         args = [_Boolean])
+                                         cons_name='True')
     ConsBooleanFalse  = DataConstructor( type_name = 'Boolean',
-                                         cons_name='False',
-                                         args = [_Boolean])
+                                         cons_name='False')
     
     Int64 = DataType( type_name = 'Int64', constructors=[ConsInt64] )
     Int32= DataType( type_name = 'Int32', constructors=[ConsInt32] )
@@ -346,14 +370,16 @@ if 1:
     TYPE_REGISTRY[ String.refhash() ] = String
     TYPE_REGISTRY[ Boolean.refhash() ] = Boolean
 
-    
-    msg = ConsInt64.data_encode(5411221)
-    ret = ConsInt64.data_decode( msg )
-    print ('t64 msg', msg, ret)
+    ConsInt64.data_set(5411221)
+    msg = ConsInt64.data_encode()
 
-    msg = ConsString.data_encode('buf baf x kuk')
-    ret = ConsString.data_decode( msg )
-    print ('str test msg', msg, ret)
+    pos = ConsInt64.data_decode( msg )
+    print ('t64 msg', msg, pos, ConsInt64.data_get() )
+
+    ConsString.data_set('buf x aaa')
+    msg = ConsString.data_encode()
+    pos = ConsString.data_decode( msg )
+    print ('str test msg', msg, pos, ConsString.data_get() )
 
 
     #idea: types made from user data (eg user records)
@@ -362,7 +388,7 @@ if 1:
                                    cons_name='ConsContact',
                                    #to_bytes=int64b_to_bytes,
                                    #from_bytes = int64b_from_bytes,
-                                   args = [String,String,String,Int64] ) #name,street,street2,number
+                                   args = [String,String,Int64] ) #name,street,zip
 
 if 0:
         

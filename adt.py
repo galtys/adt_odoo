@@ -134,7 +134,7 @@ class DataConstructor(Blob):
         if args is None:
             args = []
         self.args = args
-        self.encode_hash = encode_hash #for types with just one data constructor, has enc can be disabled
+        self.encode_hash = encode_hash #for types with just one data constructor, hash can be disabled
         self.to_bytes =to_bytes
         self.from_bytes = from_bytes
         if type_name and cons_name:

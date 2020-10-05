@@ -9,6 +9,7 @@ UUID_SIZE = 16
 SHA256_SIZE = 32
 
 TYPE_REGISTRY = collections.OrderedDict()
+DCONS_REGISTRY = collections.OrderedDict()
 
 def hash(a):
     return hashlib.sha256(a).digest()
@@ -69,7 +70,6 @@ class Blob(object):
         _pos_start = pos
         
         pos, uuid = parse_data_fixed(pos, msg, UUID_SIZE)
-        #print ([self._uuid.bytes, uuid])
         
         assert self._uuid.bytes == uuid
         
@@ -110,7 +110,6 @@ class TypeVariable(Blob):
     def decode(self, msg, pos=0):
 
         _pos, data = super(TypeVariable, self).decode(msg, pos=pos)
-        #print ('decode type var, _pos: %s, len(msg): %s' % (_pos, len(msg)) )
         pos=0
         pos, self._type_name = parse_data_var(pos, data)        
         pos, self._var = parse_data_var(pos, data)
@@ -164,8 +163,7 @@ class DataConstructor(Blob):
     def data_get(self):
         return self.data
     def data_encode(self):
-        a=self.data
-        x=self.to_bytes(self, a)
+        x=self.to_bytes(self, self.data)
         if self.encode_hash: #datacons has before, value, data hash after
             h = self.hash()
             _hx = h+x
@@ -197,7 +195,6 @@ class DataConstructor(Blob):
     
     def decode(self, msg, pos=0): 
         _pos, data = super(DataConstructor, self).decode(msg, pos=pos)
-        #print (_pos, pos, data)
         pos=0
         pos, self._type_name = parse_data_var(pos, data)
         self.type_name = self._type_name.decode("utf-8")
@@ -255,10 +252,8 @@ class DataType(Blob):
 
     def decode(self, msg, pos=0):
         _pos, data = super(DataType, self).decode(msg, pos=pos)
-        #print ([_pos,data])
         pos =0
         pos, self._type_name = parse_data_var(pos, data)
-        #print (pos, data)
         self.type_name = self._type_name.decode("utf-8")
 
         pos, self.no_type_vars = parse_number(pos, data)
@@ -321,8 +316,31 @@ def string_from_bytes(d, pos, b):
     pos, _ret = parse_data_var(pos, b)
     return pos, _ret.decode('utf-8')
 
-
-
+def product_type_to_bytes(d, a):
+    ret = b''
+    for dc_t, dc_a in zip(d.args, a):
+        c_rh, pyval = dc_a
+        cons = DCONS_REGISTRY[c_rh]
+        
+        if dc_t.type_name == cons.type_name:
+            cons.data_set( pyval)
+            ret += cons.data_encode()
+        else:
+            print ('not ok')
+    return ret
+def product_type_from_bytes(d, pos, b):
+    #cons_refhash = b[pos:pos+SHA256_SIZE]
+    #pos += SHA256_SIZE
+    #ret = []
+    cons = d #DCONS_REGISTRY[cons_refhash]
+    for a in cons.args:
+        c_rh = b[pos:pos+SHA256_SIZE]
+        c = DCONS_REGISTRY[c_rh]
+        pos = c.data_decode( b, pos=pos)
+        ret.append( c.data_get() )
+    return pos, ret
+    pass
+    
 if 1:
     _Int64 = DataType( type_name = 'Int64' )
     _Int32 = DataType( type_name = 'Int32' )
@@ -350,7 +368,6 @@ if 1:
                                   args = [_String],
                                   to_bytes=string_to_bytes,
                                   from_bytes = string_from_bytes)
-    
 
     ConsBooleanTrue  =  DataConstructor( type_name = 'Boolean',
                                          cons_name='True')
@@ -363,33 +380,51 @@ if 1:
     String = DataType( type_name = 'String', constructors=[ConsString] )
     Boolean = DataType( type_name = 'Boolean', constructors=[ConsBooleanTrue, ConsBooleanFalse] )
 
-
     TYPE_REGISTRY[ Int64.refhash() ] = Int64
     TYPE_REGISTRY[ Int32.refhash() ] = Int32
     TYPE_REGISTRY[ Int8.refhash() ] = Int8
     TYPE_REGISTRY[ String.refhash() ] = String
     TYPE_REGISTRY[ Boolean.refhash() ] = Boolean
 
-    ConsInt64.data_set(5411221)
-    msg = ConsInt64.data_encode()
+    #ConsInt64.data_set(541221) #zip
+    #msg = ConsInt64.data_encode()
 
-    pos = ConsInt64.data_decode( msg )
-    print ('t64 msg', msg, pos, ConsInt64.data_get() )
+    #pos = ConsInt64.data_decode( msg )
+    #print ('t64 msg', msg, pos, ConsInt64.data_get() )
 
-    ConsString.data_set('buf x aaa')
-    msg = ConsString.data_encode()
-    pos = ConsString.data_decode( msg )
-    print ('str test msg', msg, pos, ConsString.data_get() )
+    #ConsString.data_set('Galtys Ltd')
+    #ConsString2.data_set('88 Lower Marsh')
 
+    
+    #msg = ConsString.data_encode()
+    #pos = ConsString.data_decode( msg )
+    #print ('str test msg', msg, pos, ConsString.data_get() )
 
     #idea: types made from user data (eg user records)
 
     ConsContact = DataConstructor( type_name = 'Contact',
                                    cons_name='ConsContact',
-                                   #to_bytes=int64b_to_bytes,
-                                   #from_bytes = int64b_from_bytes,
+                                   to_bytes=product_type_to_bytes,
+                                   from_bytes = product_type_from_bytes,
                                    args = [String,String,Int64] ) #name,street,zip
+    
+    Contact = DataType( type_name = 'Contact', constructors=[ConsContact] )
 
+    TYPE_REGISTRY[ Contact.refhash() ] = Contact
+    for k,v in TYPE_REGISTRY.items():
+        for cons in v.constructors:
+            DCONS_REGISTRY[ cons.hash() ] = cons
+
+    input_data = [ (ConsString.refhash(), 'Galtys Ltd'),
+                   (ConsString.refhash(), '88 LowerMarsh'),
+                   (ConsInt64.refhash(), 33415) ]
+    
+    ConsContact.data_set( input_data )
+    msg = ConsContact.data_encode()
+    print (msg)
+
+    pos = ConsContact.data_decode(msg)
+    
 if 0:
         
     msg = dc.encode()
@@ -439,7 +474,6 @@ if 1:
     #List.decode(msg)
 
     assert _List.refhash() == List.refhash()
-
     #print (List.type_vars, List.constructors)
-
     #pprint.pprint (TYPE_REGISTRY)
+

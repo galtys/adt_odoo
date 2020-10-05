@@ -10,6 +10,7 @@ SHA256_SIZE = 32
 
 TYPE_REGISTRY = collections.OrderedDict()
 DCONS_REGISTRY = collections.OrderedDict()
+DCONS_TYPE_MAP = collections.OrderedDict()
 
 def hash(a):
     return hashlib.sha256(a).digest()
@@ -172,6 +173,10 @@ class DataConstructor(Blob):
         else:
             ret =  x
         return ret
+    def link_hash(self):
+        msg = self.data_encode()
+        assert self.encode_hash
+        return msg[(-1)*SHA256_SIZE:]
     
     def data_decode(self, msg, pos=0):
 
@@ -318,15 +323,22 @@ def string_from_bytes(d, pos, b):
 
 def product_type_to_bytes(d, a):
     ret = b''
+    type_parent_obj = DCONS_TYPE_MAP[d.hash()]
     for dc_t, dc_a in zip(d.args, a):
         c_rh, pyval = dc_a
-        cons = DCONS_REGISTRY[c_rh]
+        type_obj = DCONS_TYPE_MAP[c_rh]
         
+        cons = DCONS_REGISTRY[c_rh]
+        #print ([dc_t.type_name, cons.type_name])
+        #print ('not ok')
         if dc_t.type_name == cons.type_name:
+            #print (type_parent_obj, type_obj)
             cons.data_set( pyval)
             ret += cons.data_encode()
         else:
-            print ('not ok')
+            cons.data_set( pyval)
+            ret += cons.data_encode()
+
     return ret
 def product_type_from_bytes(d, pos, b):
     #cons_refhash = b[pos:pos+SHA256_SIZE]
@@ -406,14 +418,18 @@ if 1:
     msg = a.encode()
     
     _List = DataType( type_name = 'List' )          #List is a recursive type
-    list_cons = DataConstructor( type_name = 'List',
-                                 cons_name='ListCons',
+    ConsList = DataConstructor( type_name = 'List',
+                                 cons_name='ConsList',
+                                to_bytes=product_type_to_bytes,
+                                from_bytes = product_type_from_bytes,
                                  args = [_List, a]) 
 
-    list_nil = DataConstructor( type_name = 'List',
-                                 cons_name='Nil')
+    ConsNil = DataConstructor( type_name = 'List',
+                                to_bytes=product_type_to_bytes,
+                               from_bytes = product_type_from_bytes,
+                               cons_name='ConsNil')
     
-    List = DataType( type_name = 'List', type_vars=[a], constructors=[list_cons,list_nil]  )
+    List = DataType( type_name = 'List', type_vars=[a], constructors=[ConsList, ConsNil]  )
     TYPE_REGISTRY[ List.refhash() ] = List
     
     msg = List.encode()
@@ -427,14 +443,51 @@ if 1:
     for k,v in TYPE_REGISTRY.items():
         for cons in v.constructors:
             DCONS_REGISTRY[ cons.hash() ] = cons
+            DCONS_TYPE_MAP[ cons.hash() ] = v
 
+
+
+    #Nil
+    ConsNil.data_set(b'')
+    msg = ConsNil.data_encode()
+    linkhash  = ConsNil.link_hash()
+
+    #1
+    input_data = [ (ConsNil.hash()   , linkhash ),
+                   (ConsString.hash(), 'Galtys Ltd') ]    
+    ConsList.data_set( input_data )
+    msg = ConsList.data_encode()
+    linkhash = ConsList.link_hash()
+
+    #2
+    input_data = [ (ConsNil.hash()   , linkhash ),
+                   (ConsString.hash(), 'Muf') ]    
+    ConsList.data_set( input_data )
+    msg = ConsList.data_encode()
+    linkhash = ConsList.link_hash()
+
+    #2
+    input_data = [ (ConsNil.hash()   , linkhash ),
+                   (ConsString.hash(), 'No43') ]    
+    ConsList.data_set( input_data )
+    msg = ConsList.data_encode()
+    linkhash = ConsList.link_hash()
+    
+
+
+    
+    #linkhash = ConsList.link_hash()
+    
     input_data = [ (ConsString.hash(), 'Galtys Ltd'),
                    (ConsString.hash(), '88 LowerMarsh'),
                    (ConsInt64.hash(), 33415) ]
-    
+
+
+    #
     ConsContact.data_set( input_data )
     msg = ConsContact.data_encode()
-    print (msg)
+    
+    #print (msg)
 
     pos = ConsContact.data_decode(msg)
     

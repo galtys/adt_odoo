@@ -387,21 +387,8 @@ if 1:
     TYPE_REGISTRY[ String.refhash() ] = String
     TYPE_REGISTRY[ Boolean.refhash() ] = Boolean
 
-    #ConsInt64.data_set(541221) #zip
-    #msg = ConsInt64.data_encode()
 
-    #pos = ConsInt64.data_decode( msg )
-    #print ('t64 msg', msg, pos, ConsInt64.data_get() )
-
-    #ConsString.data_set('Galtys Ltd')
-    #ConsString2.data_set('88 Lower Marsh')
-
-    
-    #msg = ConsString.data_encode()
-    #pos = ConsString.data_decode( msg )
-    #print ('str test msg', msg, pos, ConsString.data_get() )
-
-    #idea: types made from user data (eg user records)
+    #
 
     ConsContact = DataConstructor( type_name = 'Contact',
                                    cons_name='ConsContact',
@@ -410,6 +397,31 @@ if 1:
                                    args = [String,String,Int64] ) #name,street,zip
     
     Contact = DataType( type_name = 'Contact', constructors=[ConsContact] )
+
+
+    #
+
+
+    a=TypeVariable(type_name='List', var='VARa')
+    msg = a.encode()
+    
+    _List = DataType( type_name = 'List' )          #List is a recursive type
+    list_cons = DataConstructor( type_name = 'List',
+                                 cons_name='ListCons',
+                                 args = [_List, a]) 
+
+    list_nil = DataConstructor( type_name = 'List',
+                                 cons_name='Nil')
+    
+    List = DataType( type_name = 'List', type_vars=[a], constructors=[list_cons,list_nil]  )
+    TYPE_REGISTRY[ List.refhash() ] = List
+    
+    msg = List.encode()
+    
+    assert _List.refhash() == List.refhash()
+
+    #
+    
 
     TYPE_REGISTRY[ Contact.refhash() ] = Contact
     for k,v in TYPE_REGISTRY.items():
@@ -444,37 +456,4 @@ def string_from_bytes(d, pos, b):
     pos, _ret = parse_data_var(pos, b)
     return pos, _ret.decode('utf-8')
 
-if 1:
-    #print (dc2.type_name, dc2.cons_name)
-    #print (dc2.hash() )
-    a=TypeVariable(type_name='List', var='VARa')
-    msg = a.encode()
-    #print ('X', a, len(msg) )
-
-    aa = TypeVariable()
-    sz = aa.decode( msg )
-    #print( aa.hash() )
-    #print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
-
-    
-    _List = DataType( type_name = 'List' )          #List is a recursive type
-    list_cons = DataConstructor( type_name = 'List',
-                                 cons_name='ListCons',
-                                 args = [_List, a]) 
-
-    list_nil = DataConstructor( type_name = 'List',
-                                 cons_name='Nil')
-    
-
-    List = DataType( type_name = 'List', type_vars=[a], constructors=[list_cons,list_nil]  )
-    TYPE_REGISTRY[ List.refhash() ] = List
-    
-    msg = List.encode()
-    
-    #List = DataType()
-    #List.decode(msg)
-
-    assert _List.refhash() == List.refhash()
-    #print (List.type_vars, List.constructors)
-    #pprint.pprint (TYPE_REGISTRY)
 

@@ -1,10 +1,14 @@
 import uuid
 import hashlib
 import varint
+import collections
+import pprint
 
 GALTYS_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS,'galtys.com')
 UUID_SIZE = 16
 SHA256_SIZE = 32
+
+TYPE_REGISTRY = collections.OrderedDict()
 
 def hash(a):
     return hashlib.sha256(a).digest()
@@ -96,7 +100,10 @@ class TypeVariable(Blob):
             
     def init(self):
             self._data = encode_data_var(self._type_name) + encode_data_var(self._var)
-            
+#    def to_bytes(self, a):
+#        return None
+#    def from_bytes(self, pos, b):
+#        return None
     def refhash(self):
         h = hashlib.sha256(self._uuid.bytes + self._type_name + self._var)
         return h.digest()
@@ -147,13 +154,8 @@ class DataConstructor(Blob):
     def refhash(self):
         h = hashlib.sha256(self._uuid.bytes + self._type_name + self._cons_name)
         return h.digest()
-    #def encode(self, data_args = None):
-        #if data_args and self.to_bytes:
-        #    x=self.to_bytes(self, data_args)
-        #    print (x)
-        #    self._data += x
-        #ret = super(DataConstructor, self).encode()
-        #return ret
+    def __repr__(self):
+        return "<%s %s %s %s>"%(self._type, self.refhash().hex(), self.type_name, self.cons_name)
     def data_encode(self, a):
         x=self.to_bytes(self, a)
         return x
@@ -216,7 +218,8 @@ class DataType(Blob):
             for cons in self.constructors:
                 #self._data += type_v.refhash()
                 self._data += cons.encode()
-            
+    def __repr__(self):
+        return "<%s %s %s>"%(self._type, self.refhash().hex(), self.type_name)
     def refhash(self): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
         h = hashlib.sha256(self._uuid.bytes + self._type_name)
         return h.digest()
@@ -271,6 +274,16 @@ def int32b_from_bytes(d, pos, b):
     pos+=4
     return pos, ret
 
+def int8b_to_bytes(d, a):
+    ret=a.to_bytes(1, byteorder='big' )
+    return ret
+
+def int8b_from_bytes(d, pos, b):
+    ret=int.from_bytes(b[pos:], byteorder='big' )
+    pos+=1
+    return pos, ret
+
+
 def string_to_bytes(d, a):
     ab = bytes(a, 'utf-8') #bytes
     ret = encode_data_var(ab)
@@ -281,26 +294,44 @@ def string_from_bytes(d, pos, b):
     return pos, _ret.decode('utf-8')
 
 
-a=TypeVariable(type_name='List', var='VARa')
-
-
-msg = a.encode()
-#print ('X', a, len(msg) )
-
-aa = TypeVariable()
-sz = aa.decode( msg )
-#print( aa.hash() )
-#print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
 
 if 1:
     ConsInt64 = DataConstructor( type_name = 'Int64',
                              cons_name='ConsInt64',
                              to_bytes=int64b_to_bytes,
                              from_bytes = int64b_from_bytes)
+    ConsInt32 = DataConstructor( type_name = 'Int32',
+                             cons_name='ConsInt32',
+                             to_bytes=int32b_to_bytes,
+                             from_bytes = int32b_from_bytes)
+    ConsInt8 = DataConstructor( type_name = 'Int8',
+                             cons_name='ConsInt8',
+                             to_bytes=int8b_to_bytes,
+                             from_bytes = int8b_from_bytes)
+    
     ConsString = DataConstructor( type_name = 'String',
                              cons_name='ConsString',
                              to_bytes=string_to_bytes,
                              from_bytes = string_from_bytes)
+
+    
+    Int64 = DataType( type_name = 'Int64', constructors=[ConsInt64] )
+    Int32= DataType( type_name = 'Int32', constructors=[ConsInt32] )
+    Int8 = DataType( type_name = 'Int8', constructors=[ConsInt8] )    
+    String = DataType( type_name = 'String', constructors=[ConsString] )
+
+    ConsBooleanTrue  =  DataConstructor( type_name = 'Boolean', cons_name='True')
+    ConsBooleanFalse  = DataConstructor( type_name = 'Boolean', cons_name='False')
+
+    Boolean = DataType( type_name = 'Boolean', constructors=[ConsBooleanTrue, ConsBooleanFalse] )
+
+
+    TYPE_REGISTRY[ Int64.refhash() ] = Int64
+    TYPE_REGISTRY[ Int32.refhash() ] = Int32
+    TYPE_REGISTRY[ Int8.refhash() ] = Int8
+    TYPE_REGISTRY[ String.refhash() ] = String
+    TYPE_REGISTRY[ Boolean.refhash() ] = Boolean
+
     
     msg = ConsInt64.data_encode(5411221)
     ret = ConsInt64.data_decode( msg )
@@ -310,8 +341,17 @@ if 1:
     ret = ConsString.data_decode( msg )
     print ('str test msg', msg, ret)
 
+
+    #idea: types made from user data (eg user records)
+
+    ConsContact = DataConstructor( type_name = 'Contact',
+                                   cons_name='ConsContact',
+                                   #to_bytes=int64b_to_bytes,
+                                   #from_bytes = int64b_from_bytes,
+                                   args = [String,String,String,Int64] ) #name,street,street2,number
+
 if 0:
-    dc = DataConstructor( type_name = 'Boolean', cons_name='True')
+        
     msg = dc.encode()
     dc2 = DataConstructor()
     dc2.decode(msg)
@@ -331,24 +371,35 @@ def string_from_bytes(d, pos, b):
 if 1:
     #print (dc2.type_name, dc2.cons_name)
     #print (dc2.hash() )
+    a=TypeVariable(type_name='List', var='VARa')
+    msg = a.encode()
+    #print ('X', a, len(msg) )
+
+    aa = TypeVariable()
+    sz = aa.decode( msg )
+    #print( aa.hash() )
+    #print ('type var a, sz: %s, len msg: %s' % (sz, len(msg)) )
 
     
+    _List = DataType( type_name = 'List' )          #List is a recursive type
     list_cons = DataConstructor( type_name = 'List',
                                  cons_name='ListCons',
-                                 args = [a])
-
+                                 args = [_List, a]) 
 
     list_nil = DataConstructor( type_name = 'List',
                                  cons_name='Nil')
     
 
-    _List = DataType( type_name = 'List', type_vars=[a], constructors=[list_cons,list_nil]  )
-    msg = _List.encode()
+    List = DataType( type_name = 'List', type_vars=[a], constructors=[list_cons,list_nil]  )
+    TYPE_REGISTRY[ List.refhash() ] = List
     
-    List = DataType()
-    List.decode(msg)
+    msg = List.encode()
+    
+    #List = DataType()
+    #List.decode(msg)
 
-    assert _List.hash() == List.hash()
+    assert _List.refhash() == List.refhash()
 
-    print (List.type_vars, List.constructors)
+    #print (List.type_vars, List.constructors)
 
+    #pprint.pprint (TYPE_REGISTRY)

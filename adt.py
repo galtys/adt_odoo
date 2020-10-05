@@ -331,13 +331,14 @@ def product_type_to_bytes(d, a):
 def product_type_from_bytes(d, pos, b):
     #cons_refhash = b[pos:pos+SHA256_SIZE]
     #pos += SHA256_SIZE
-    #ret = []
+    ret = []
     cons = d #DCONS_REGISTRY[cons_refhash]
     for a in cons.args:
         c_rh = b[pos:pos+SHA256_SIZE]
         c = DCONS_REGISTRY[c_rh]
         pos = c.data_decode( b, pos=pos)
-        ret.append( c.data_get() )
+        ret.append( (c_rh, c.data_get()) )
+        
     return pos, ret
     pass
     
@@ -415,9 +416,9 @@ if 1:
         for cons in v.constructors:
             DCONS_REGISTRY[ cons.hash() ] = cons
 
-    input_data = [ (ConsString.refhash(), 'Galtys Ltd'),
-                   (ConsString.refhash(), '88 LowerMarsh'),
-                   (ConsInt64.refhash(), 33415) ]
+    input_data = [ (ConsString.hash(), 'Galtys Ltd'),
+                   (ConsString.hash(), '88 LowerMarsh'),
+                   (ConsInt64.hash(), 33415) ]
     
     ConsContact.data_set( input_data )
     msg = ConsContact.data_encode()

@@ -445,34 +445,39 @@ if 1:
             DCONS_REGISTRY[ cons.hash() ] = cons
             DCONS_TYPE_MAP[ cons.hash() ] = v
 
-
+    fp = open('test.bin', 'wb')
 
     #Nil
     ConsNil.data_set(b'')
     msg = ConsNil.data_encode()
     linkhash  = ConsNil.link_hash()
-
+    fp.write(msg)
+    
     #1
     input_data = [ (ConsNil.hash()   , linkhash ),
                    (ConsString.hash(), 'Galtys Ltd') ]    
     ConsList.data_set( input_data )
     msg = ConsList.data_encode()
     linkhash = ConsList.link_hash()
-
+    fp.write(msg)
+    
     #2
     input_data = [ (ConsNil.hash()   , linkhash ),
                    (ConsString.hash(), 'Muf') ]    
     ConsList.data_set( input_data )
     msg = ConsList.data_encode()
     linkhash = ConsList.link_hash()
-
-    #2
+    fp.write(msg)
+    
+    #3
     input_data = [ (ConsNil.hash()   , linkhash ),
                    (ConsString.hash(), 'No43') ]    
     ConsList.data_set( input_data )
     msg = ConsList.data_encode()
     linkhash = ConsList.link_hash()
-    
+    fp.write(msg)
+
+    fp.close()
 
 
     

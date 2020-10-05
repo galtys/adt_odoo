@@ -133,6 +133,7 @@ class DataConstructor(Blob):
         if args is None:
             args = []
         self.args = args
+        
         self.to_bytes =to_bytes
         self.from_bytes = from_bytes
         if type_name and cons_name:
@@ -296,33 +297,46 @@ def string_from_bytes(d, pos, b):
 
 
 if 1:
+    _Int64 = DataType( type_name = 'Int64' )
+    _Int32 = DataType( type_name = 'Int32' )
+    _Int8 = DataType( type_name = 'Int8' )
+    _String = DataType( type_name = 'String' )
+    _Boolean = DataType( type_name = 'Boolean' )
+    
     ConsInt64 = DataConstructor( type_name = 'Int64',
                              cons_name='ConsInt64',
-                             to_bytes=int64b_to_bytes,
+                             args = [_Int64],
+                             to_bytes=int64b_to_bytes,  
                              from_bytes = int64b_from_bytes)
     ConsInt32 = DataConstructor( type_name = 'Int32',
                              cons_name='ConsInt32',
+                             args = [_Int32],                                 
                              to_bytes=int32b_to_bytes,
                              from_bytes = int32b_from_bytes)
     ConsInt8 = DataConstructor( type_name = 'Int8',
                              cons_name='ConsInt8',
+                             args = [_Int8],                                
                              to_bytes=int8b_to_bytes,
                              from_bytes = int8b_from_bytes)
     
     ConsString = DataConstructor( type_name = 'String',
-                             cons_name='ConsString',
-                             to_bytes=string_to_bytes,
-                             from_bytes = string_from_bytes)
+                                  cons_name='ConsString',
+                                  args = [_String],
+                                  to_bytes=string_to_bytes,
+                                  from_bytes = string_from_bytes)
+    
 
+    ConsBooleanTrue  =  DataConstructor( type_name = 'Boolean',
+                                         cons_name='True',
+                                         args = [_Boolean])
+    ConsBooleanFalse  = DataConstructor( type_name = 'Boolean',
+                                         cons_name='False',
+                                         args = [_Boolean])
     
     Int64 = DataType( type_name = 'Int64', constructors=[ConsInt64] )
     Int32= DataType( type_name = 'Int32', constructors=[ConsInt32] )
     Int8 = DataType( type_name = 'Int8', constructors=[ConsInt8] )    
     String = DataType( type_name = 'String', constructors=[ConsString] )
-
-    ConsBooleanTrue  =  DataConstructor( type_name = 'Boolean', cons_name='True')
-    ConsBooleanFalse  = DataConstructor( type_name = 'Boolean', cons_name='False')
-
     Boolean = DataType( type_name = 'Boolean', constructors=[ConsBooleanTrue, ConsBooleanFalse] )
 
 

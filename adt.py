@@ -167,7 +167,10 @@ class DataConstructor(Blob):
         #print (44*'-', self.to_bytes)
         #print (self.data)
         #print (self)
-        x=self.to_bytes(self, self.data)
+        if self.data is None:
+           x=b''
+        else:
+           x=self.to_bytes(self, self.data)
         if self.encode_hash: #datacons has before, value, data hash after
             h = self.hash()
             _hx = h+x
@@ -187,8 +190,12 @@ class DataConstructor(Blob):
             h = self.hash()
             assert h == msg[pos:pos+SHA256_SIZE]
             pos += SHA256_SIZE
+
+            if self.from_bytes is not None:
+                pos, ret = self.from_bytes(self, pos, msg )
+            else:
+                ret = None
             
-            pos, ret = self.from_bytes(self, pos, msg )
             h2d = msg[pos:pos+SHA256_SIZE]
             pos += SHA256_SIZE
         else:
@@ -196,10 +203,11 @@ class DataConstructor(Blob):
         self.data = ret
         if self.encode_hash:
             #print (['CHECK: ', self.data])
-            x=self.to_bytes(self, self.data)
-            h = self.hash()
-            h2 = hashlib.sha256( h+x ).digest()
-            assert h2 == h2d            
+            if self.from_bytes is not None:
+                x=self.to_bytes(self, self.data)
+                h = self.hash()
+                h2 = hashlib.sha256( h+x ).digest()
+                assert h2 == h2d            
         return pos
     
     def decode(self, msg, pos=0): 
@@ -325,6 +333,16 @@ def string_from_bytes(d, pos, b, type_as_parent=False):
     pos, _ret = parse_data_var(pos, b)
     return pos, _ret.decode('utf-8')
 
+
+def binary_to_bytes(d, a, type_as_parent=False):
+    #ab = bytes(a, 'utf-8') #bytes
+    ret = encode_data_var(a)
+    return ret
+
+def binary_from_bytes(d, pos, b, type_as_parent=False):
+    pos, _ret = parse_data_var(pos, b)
+    return pos, _ret
+
 def product_type_to_bytes(d, a, type_as_parent=False):
     ret = b''
     type_parent_obj = DCONS_TYPE_MAP[d.hash()]
@@ -393,13 +411,90 @@ def product_type_from_bytes(d, pos, b, type_as_parent=False):
             ret.append( (c_rh, c.data_get()) )
         
     return pos, ret
-    
+
+
+def product_type_list_to_bytes(d, a, type_as_parent=False):
+    ret = b''
+    type_parent_obj = DCONS_TYPE_MAP[d.hash()]
+    #print (type_parent_obj)
+    #print (a)
+    if isinstance(a, list):
+        for dc_t, dc_a in zip(d.args, a):
+            
+            #print (dc_a)
+            c_rh, pyval = dc_a
+            type_obj = DCONS_TYPE_MAP[c_rh]
+
+            cons = DCONS_REGISTRY[c_rh]
+            #print ([dc_t.type_name, cons.type_name])
+            #print ('not ok')
+            if dc_t.type_name == cons.type_name:
+                #print (type_parent_obj, type_obj)
+                cons.data_set( pyval)
+                ret += cons.data_encode()
+            else:
+                cons.data_set( pyval)
+                ret += cons.data_encode()
+    else:
+        #print ('a: ', a)
+        c_rh, pyval  = a
+        #print ('pyval', pyval)
+        obj_t = DCONS_TYPE_MAP[c_rh]
+        #print ('buf' )
+        assert type_parent_obj.hash()==obj_t.hash()
+        cons = DCONS_REGISTRY[c_rh]
+        cons.data_set( pyval)
+        ret += cons.data_encode()
+        
+        #ret += c_rh
+        #print ('XXX pyval', pyval)
+        #ret += pyval
+        
+    return ret
+def product_type_list_from_bytes(d, pos, b, type_as_parent=False):
+    #cons_refhash = b[pos:pos+SHA256_SIZE]
+    #pos += SHA256_SIZE
+    ret = []
+    cons = d #DCONS_REGISTRY[cons_refhash]
+    type_parent_obj = DCONS_TYPE_MAP[d.hash()]
+
+    type_as_parent = False
+    p1=(pos-SHA256_SIZE)
+    if p1>=0:
+        c_rh = b[pos-SHA256_SIZE:pos]
+        c = DCONS_REGISTRY[c_rh]
+        obj_t = DCONS_TYPE_MAP[c_rh]        
+        if ( type_parent_obj.hash() == obj_t.hash() ):
+                type_as_parent = True
+    if 0: #type_as_parent:
+        #pos += SHA256_SIZE
+        pos += SHA256_SIZE
+        blob = b[pos : pos + SHA256_SIZE]
+        #pos += SHA256_SIZE
+        
+        ret = (c_rh, blob )
+        print (44*'-')
+        print (b[pos:])
+        print ('RET: ', ret)
+    else:
+        for a in cons.args:
+            c_rh = b[pos:pos+SHA256_SIZE]
+            c = DCONS_REGISTRY[c_rh]
+
+            obj_t = DCONS_TYPE_MAP[c_rh]
+            #if type_parent_obj.hash() != obj_t.hash():
+            pos = c.data_decode( b, pos=pos)
+            ret.append( (c_rh, c.data_get()) )
+        
+    return pos, ret
+
 if 1:
     _Int64 = DataType( type_name = 'Int64' )
     _Int32 = DataType( type_name = 'Int32' )
     _Int8 = DataType( type_name = 'Int8' )
     _String = DataType( type_name = 'String' )
-    
+    _Binary = DataType( type_name = 'Binary' )
+        
     ConsInt64 = DataConstructor( type_name = 'Int64',
                              cons_name='ConsInt64',
                              args = [_Int64], #shoud be python buildin type int .. ?
@@ -421,7 +516,13 @@ if 1:
                                   args = [_String],
                                   to_bytes=string_to_bytes,
                                   from_bytes = string_from_bytes)
-
+    
+    ConsBinary = DataConstructor( type_name = 'Binary',
+                                  cons_name='ConsBinary',
+                                  args = [_Binary],
+                                  to_bytes=binary_to_bytes,
+                                  from_bytes = binary_from_bytes)
+    
     ConsBooleanTrue  =  DataConstructor( type_name = 'Boolean',
                                          cons_name='True')
     ConsBooleanFalse  = DataConstructor( type_name = 'Boolean',
@@ -431,12 +532,14 @@ if 1:
     Int32= DataType( type_name = 'Int32', constructors=[ConsInt32] )
     Int8 = DataType( type_name = 'Int8', constructors=[ConsInt8] )    
     String = DataType( type_name = 'String', constructors=[ConsString] )
+    Binary = DataType( type_name = 'Binary', constructors=[ConsBinary] )
     Boolean = DataType( type_name = 'Boolean', constructors=[ConsBooleanTrue, ConsBooleanFalse] )
 
     TYPE_REGISTRY[ Int64.refhash() ] = Int64
     TYPE_REGISTRY[ Int32.refhash() ] = Int32
     TYPE_REGISTRY[ Int8.refhash() ] = Int8
     TYPE_REGISTRY[ String.refhash() ] = String
+    TYPE_REGISTRY[ Binary.refhash() ] = Binary
     TYPE_REGISTRY[ Boolean.refhash() ] = Boolean
 
 
@@ -460,13 +563,13 @@ if 1:
     _List = DataType( type_name = 'List' )          #List is a recursive type
     ConsList = DataConstructor( type_name = 'List',
                                  cons_name='ConsList',
-                                to_bytes=product_type_to_bytes,
-                                from_bytes = product_type_from_bytes,
+                                to_bytes=product_type_list_to_bytes,
+                                from_bytes = product_type_list_from_bytes,
                                  args = [_List, a]) 
 
     ConsNil = DataConstructor( type_name = 'List',
-                                to_bytes=product_type_to_bytes,
-                               from_bytes = product_type_from_bytes,
+                                to_bytes=product_type_list_to_bytes,
+                               #from_bytes = product_type_list_from_bytes,
                                cons_name='ConsNil')
     
     List = DataType( type_name = 'List', type_vars=[a], constructors=[ConsList, ConsNil]  )
@@ -482,60 +585,57 @@ if 1:
         for cons in v.constructors:
             DCONS_REGISTRY[ cons.hash() ] = cons
             DCONS_TYPE_MAP[ cons.hash() ] = v
-
-    if 0:
+    #print ('ConsList.hash(): ', ConsList.hash() )
+    if 1:
 
         fp = open('test.bin', 'wb')
 
         #Nil
-        ConsNil.data_set( b''   )
+        ConsNil.data_set( None)
+        
         msg = ConsNil.data_encode()
         linkhash  = ConsNil.link_hash()
-        #nilhash = linkhash
         #fp.write(msg)
-        #print (msg)
-        print ('nil', linkhash)
+        
         #1
-        input_data = [ (ConsList.hash()   , (ConsList.hash(),linkhash) ),
+        input_data = [ (ConsBinary.hash()   , linkhash ),
                        (ConsString.hash(), 'Galtys Ltd') ]
-
-        #print ('RET    ', (ConsList.hash(),linkhash) )
-        #ConsList.data_set( (ConsList.hash(),linkhash) )
         ConsList.data_set( input_data )
         msg = ConsList.data_encode()
         linkhash = ConsList.link_hash()
-        print (linkhash)
-        #print (msg)
 
-        #print (44*'_')
-
-        #ConsList.data_decode(msg, pos=0)
-
-
+        sz=ConsList.data_decode(msg)
+        #print ( ConsList.data_get() )
+        print (sz,len(msg), linkhash)
 
         fp.write(msg)
 
         #2
-        input_data = [ (ConsList.hash()   , (ConsList.hash(),linkhash) ),
+        input_data = [ (ConsBinary.hash()   ,linkhash ),
                        (ConsString.hash(), 'Muf') ]    
         ConsList.data_set( input_data )
         msg = ConsList.data_encode()
+        
         linkhash = ConsList.link_hash()
-        print (linkhash)
+        sz=ConsList.data_decode(msg)
+        #print ( ConsList.data_get() )        
+        print (sz, len(msg),linkhash)
         fp.write(msg)
 
         #3
-        input_data = [ (ConsList.hash()   , (ConsList.hash(), linkhash) ),
+        input_data = [ (ConsBinary.hash()   , linkhash ),
                        (ConsString.hash(), 'No43') ]    
         ConsList.data_set( input_data )
         msg = ConsList.data_encode()
         linkhash = ConsList.link_hash()
-        print (linkhash)
+        sz=ConsList.data_decode(msg)
+        #print ( ConsList.data_get() )        
+        print (sz, len(msg), linkhash)
         fp.write(msg)
 
         fp.close()
 
-    if 0:
+    if 1:
 
         test_map = {}
         fp = open('test.bin', 'br')
@@ -543,39 +643,38 @@ if 1:
         fp.close()
         #print (msg)
 
-
-
-
         pos = 0
         N = len(msg)
         cont = True
         while cont:
             HEAD = msg[pos:pos+SHA256_SIZE]
             cons = DCONS_REGISTRY[HEAD]
-            print (cons)
+            #print (cons)
             pos = cons.data_decode(msg, pos=pos)
             ret = cons.data_get()
+            #conshash, val = ret
+            
             #if len(ret)>0:
-            #    conshash, val = ret
-            #    print (val)
+            #    
+            #print (val)
             #else:
             print (ret)
             if pos>=N:
                 cont=False
         #linkhash = ConsList.link_hash()
-    
-    input_data = [ (ConsString.hash(), 'Galtys Ltd'),
-                   (ConsString.hash(), '88 LowerMarsh'),
-                   (ConsInt64.hash(), 33415) ]
+    if 0:
+        input_data = [ (ConsString.hash(), 'Galtys Ltd'),
+                       (ConsString.hash(), '88 LowerMarsh'),
+                       (ConsInt64.hash(), 33415) ]
 
 
-    #
-    ConsContact.data_set( input_data )
-    msg = ConsContact.data_encode()
-    
-    #print (msg)
+        #
+        ConsContact.data_set( input_data )
+        msg = ConsContact.data_encode()
 
-    pos = ConsContact.data_decode(msg)
+        #print (msg)
+
+        pos = ConsContact.data_decode(msg)
     
 if 0:
         

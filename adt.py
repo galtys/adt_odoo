@@ -249,7 +249,8 @@ class DataType(Blob):
             self.init()
             
     def init(self):            
-            self._data = encode_data_var(self._type_name) #DataConstructor(type_name=type_name, cons_name=cons_name).encode()
+            self._data = encode_data_var(self._type_name)
+            #DataConstructor(type_name=type_name, cons_name=cons_name).encode()
             self._data += encode_number( len(self.type_vars) )
             
             for type_v in self.type_vars:
@@ -263,7 +264,8 @@ class DataType(Blob):
                 self._data += cons.encode()
     def __repr__(self):
         return "<%s %s %s>"%(self._type, self.refhash().hex(), self.type_name)
-    def refhash(self): #due to the suport of recursive types, reference hash is (self._uuid + type_name)
+    def refhash(self):
+        #due to the suport of recursive types, reference hash is (self._uuid + type_name)
         h = hashlib.sha256(self._uuid.bytes + self._type_name)
         return h.digest()
 
@@ -348,7 +350,8 @@ def product_type_to_bytes(d, a, type_as_parent=False):
     type_parent_obj = DCONS_TYPE_MAP[d.hash()]
     #print (type_parent_obj)
     #print (a)
-    if isinstance(a, list):
+    #if isinstance(a, list):
+    if 1:
         for dc_t, dc_a in zip(d.args, a):
             
             #print (dc_a)
@@ -365,14 +368,6 @@ def product_type_to_bytes(d, a, type_as_parent=False):
             else:
                 cons.data_set( pyval)
                 ret += cons.data_encode()
-    elif isinstance(a, tuple):
-        c_rh, pyval  = a
-        obj_t = DCONS_TYPE_MAP[c_rh]
-        #print ('buf' )
-        assert type_parent_obj.hash()==obj_t.hash()
-        #ret += c_rh
-        #print ('XXX pyval', pyval)
-        ret += pyval
         
     return ret
 def product_type_from_bytes(d, pos, b, type_as_parent=False):
@@ -381,26 +376,7 @@ def product_type_from_bytes(d, pos, b, type_as_parent=False):
     ret = []
     cons = d #DCONS_REGISTRY[cons_refhash]
     type_parent_obj = DCONS_TYPE_MAP[d.hash()]
-
-    type_as_parent = False
-    p1=(pos-SHA256_SIZE)
-    if p1>=0:
-        c_rh = b[pos-SHA256_SIZE:pos]
-        c = DCONS_REGISTRY[c_rh]
-        obj_t = DCONS_TYPE_MAP[c_rh]        
-        if ( type_parent_obj.hash() == obj_t.hash() ):
-                type_as_parent = True
-    if 0: #type_as_parent:
-        #pos += SHA256_SIZE
-        pos += SHA256_SIZE
-        blob = b[pos : pos + SHA256_SIZE]
-        #pos += SHA256_SIZE
-        
-        ret = (c_rh, blob )
-        print (44*'-')
-        print (b[pos:])
-        print ('RET: ', ret)
-    else:
+    if 1:
         for a in cons.args:
             c_rh = b[pos:pos+SHA256_SIZE]
             c = DCONS_REGISTRY[c_rh]
@@ -413,80 +389,6 @@ def product_type_from_bytes(d, pos, b, type_as_parent=False):
     return pos, ret
 
 
-def product_type_list_to_bytes(d, a, type_as_parent=False):
-    ret = b''
-    type_parent_obj = DCONS_TYPE_MAP[d.hash()]
-    #print (type_parent_obj)
-    #print (a)
-    if isinstance(a, list):
-        for dc_t, dc_a in zip(d.args, a):
-            
-            #print (dc_a)
-            c_rh, pyval = dc_a
-            type_obj = DCONS_TYPE_MAP[c_rh]
-
-            cons = DCONS_REGISTRY[c_rh]
-            #print ([dc_t.type_name, cons.type_name])
-            #print ('not ok')
-            if dc_t.type_name == cons.type_name:
-                #print (type_parent_obj, type_obj)
-                cons.data_set( pyval)
-                ret += cons.data_encode()
-            else:
-                cons.data_set( pyval)
-                ret += cons.data_encode()
-    else:
-        #print ('a: ', a)
-        c_rh, pyval  = a
-        #print ('pyval', pyval)
-        obj_t = DCONS_TYPE_MAP[c_rh]
-        #print ('buf' )
-        assert type_parent_obj.hash()==obj_t.hash()
-        cons = DCONS_REGISTRY[c_rh]
-        cons.data_set( pyval)
-        ret += cons.data_encode()
-        
-        #ret += c_rh
-        #print ('XXX pyval', pyval)
-        #ret += pyval
-        
-    return ret
-def product_type_list_from_bytes(d, pos, b, type_as_parent=False):
-    #cons_refhash = b[pos:pos+SHA256_SIZE]
-    #pos += SHA256_SIZE
-    ret = []
-    cons = d #DCONS_REGISTRY[cons_refhash]
-    type_parent_obj = DCONS_TYPE_MAP[d.hash()]
-
-    type_as_parent = False
-    p1=(pos-SHA256_SIZE)
-    if p1>=0:
-        c_rh = b[pos-SHA256_SIZE:pos]
-        c = DCONS_REGISTRY[c_rh]
-        obj_t = DCONS_TYPE_MAP[c_rh]        
-        if ( type_parent_obj.hash() == obj_t.hash() ):
-                type_as_parent = True
-    if 0: #type_as_parent:
-        #pos += SHA256_SIZE
-        pos += SHA256_SIZE
-        blob = b[pos : pos + SHA256_SIZE]
-        #pos += SHA256_SIZE
-        
-        ret = (c_rh, blob )
-        print (44*'-')
-        print (b[pos:])
-        print ('RET: ', ret)
-    else:
-        for a in cons.args:
-            c_rh = b[pos:pos+SHA256_SIZE]
-            c = DCONS_REGISTRY[c_rh]
-
-            obj_t = DCONS_TYPE_MAP[c_rh]
-            #if type_parent_obj.hash() != obj_t.hash():
-            pos = c.data_decode( b, pos=pos)
-            ret.append( (c_rh, c.data_get()) )
-        
-    return pos, ret
 
 if 1:
     _Int64 = DataType( type_name = 'Int64' )
@@ -563,12 +465,12 @@ if 1:
     _List = DataType( type_name = 'List' )          #List is a recursive type
     ConsList = DataConstructor( type_name = 'List',
                                  cons_name='ConsList',
-                                to_bytes=product_type_list_to_bytes,
-                                from_bytes = product_type_list_from_bytes,
+                                to_bytes=product_type_to_bytes,
+                                from_bytes = product_type_from_bytes,
                                  args = [_List, a]) 
 
     ConsNil = DataConstructor( type_name = 'List',
-                                to_bytes=product_type_list_to_bytes,
+                                to_bytes=product_type_to_bytes,
                                #from_bytes = product_type_list_from_bytes,
                                cons_name='ConsNil')
     

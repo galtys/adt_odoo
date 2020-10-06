@@ -350,7 +350,8 @@ def product_type_to_bytes(d, a, type_as_parent=False):
     type_parent_obj = DCONS_TYPE_MAP[d.hash()]
     #print (type_parent_obj)
     #print (a)
-    if isinstance(a, list):
+    #if isinstance(a, list):
+    if 1:
         for dc_t, dc_a in zip(d.args, a):
             
             #print (dc_a)
@@ -367,14 +368,6 @@ def product_type_to_bytes(d, a, type_as_parent=False):
             else:
                 cons.data_set( pyval)
                 ret += cons.data_encode()
-    elif isinstance(a, tuple):
-        c_rh, pyval  = a
-        obj_t = DCONS_TYPE_MAP[c_rh]
-        #print ('buf' )
-        assert type_parent_obj.hash()==obj_t.hash()
-        #ret += c_rh
-        #print ('XXX pyval', pyval)
-        ret += pyval
         
     return ret
 def product_type_from_bytes(d, pos, b, type_as_parent=False):
@@ -383,26 +376,7 @@ def product_type_from_bytes(d, pos, b, type_as_parent=False):
     ret = []
     cons = d #DCONS_REGISTRY[cons_refhash]
     type_parent_obj = DCONS_TYPE_MAP[d.hash()]
-
-    type_as_parent = False
-    p1=(pos-SHA256_SIZE)
-    if p1>=0:
-        c_rh = b[pos-SHA256_SIZE:pos]
-        c = DCONS_REGISTRY[c_rh]
-        obj_t = DCONS_TYPE_MAP[c_rh]        
-        if ( type_parent_obj.hash() == obj_t.hash() ):
-                type_as_parent = True
-    if 0: #type_as_parent:
-        #pos += SHA256_SIZE
-        pos += SHA256_SIZE
-        blob = b[pos : pos + SHA256_SIZE]
-        #pos += SHA256_SIZE
-        
-        ret = (c_rh, blob )
-        print (44*'-')
-        print (b[pos:])
-        print ('RET: ', ret)
-    else:
+    if 1:
         for a in cons.args:
             c_rh = b[pos:pos+SHA256_SIZE]
             c = DCONS_REGISTRY[c_rh]

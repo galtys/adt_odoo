@@ -133,7 +133,7 @@ class DataConstructor(Blob):
                  args=None, to_bytes=None, from_bytes=None,
                  encode_hash=True):
         if args is None:
-            args = []
+             args = []
         self.args = args
         self.encode_hash = encode_hash #for types with just one data constructor, hash can be disabled
         self.to_bytes =to_bytes
